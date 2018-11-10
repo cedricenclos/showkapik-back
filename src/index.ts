@@ -1,7 +1,7 @@
-class App {
-  constructor() {
-    console.log("Hello world !");
-  }
-}
+import * as express from 'express'
 
-new App();
+const app = express()
+
+app.get('/', () => {
+  console.log('get')
+})
