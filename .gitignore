@@ -2,6 +2,7 @@
 
 # custom folder
 /src/assets/resources
+/src/GlobalEnvironment.ts
 
 # compiled output
 /dist
