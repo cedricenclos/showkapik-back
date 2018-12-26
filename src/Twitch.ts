@@ -23,10 +23,8 @@ export class Twitch {
     }
   }
 
-  async getStreamers(): Promise<HelixUser[]> {
-    const streamer = ['lpe_glasfeu', 'skollnope', 'myst80', 'lpe_titou', 'barnus88', 'mielodar']
-
-    return await this.twitchClient.helix.users.getUsersByNames(streamer)
+  async getStreamers(streamersList: string[]): Promise<HelixUser[]> {
+    return await this.twitchClient.helix.users.getUsersByNames(streamersList)
   }
 
   async getStreamer(userName: string): Promise<HelixUser> {

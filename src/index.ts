@@ -1,4 +1,5 @@
 import { GlobalEnvironment } from './GlobalEnvironment'
+import { MongooseAdapter } from './MongooseAdapter'
 import { Twitch } from './Twitch'
 
 // Define our dependencies
@@ -14,7 +15,11 @@ const program = require('commander')
 program
   .version('0.0.1')
   .option('-p, --prod', 'Activate production mode')
+  .option('-m, --mongo [url]', 'Specify the mongodb uri', 'localhost')
   .parse(process.argv)
+
+console.log('---')
+console.log('Back properties :\n')
 
 // Twitch auth constants
 let TWITCH_CLIENT_ID = 's64mw7a2valx6j8va02pqnm5vn1100'
@@ -24,14 +29,14 @@ let CALLBACK_URL = 'http://localhost:3000/auth/twitch/callback'
 let REDIRECT_URL = 'http://localhost:4200/'
 
 if (program.prod) {
-  console.log('mode : PRODUCTION')
+  console.log('Mode : PRODUCTION')
   TWITCH_CLIENT_ID = 'mrwdbmh6pvc2791sfg3uib70o59e3z'
   TWITCH_SECRET = GlobalEnvironment.prodTwitchSecret
   SESSION_SECRET = GlobalEnvironment.prodSessionSecret
   CALLBACK_URL = 'http://showkapik.ddns.net:3000/auth/twitch/callback'
   REDIRECT_URL = 'http://showkapik.ddns.net'
 } else {
-  console.log('mode : DEVELOPMENT')
+  console.log('Mode : DEVELOPMENT')
 }
 
 let twitch = new Twitch(TWITCH_CLIENT_ID, TWITCH_SECRET)
@@ -41,6 +46,7 @@ const app = express()
 
 app.use(session({ secret: SESSION_SECRET, resave: false, saveUninitialized: false }))
 app.use(express.static('public'))
+app.use(express.json())
 app.use(passport.initialize())
 app.use(passport.session())
 
@@ -99,6 +105,27 @@ passport.use(
 )
 
 // ----------------------------------------------------------------------------------------------------------
+// MONGO INIT
+
+const mongoose = new MongooseAdapter()
+let connected = false
+console.log('Mongo : ', program.mongo)
+mongoose
+  .connect(
+    program.mongo,
+    'Showkapik'
+  )
+  .then((v) => {
+    console.log('Mongo Connection Successful')
+    connected = true
+  })
+  .catch((err) => {
+    console.log('Mongo Connection error : ', err)
+  })
+
+console.log('\n---')
+
+// ----------------------------------------------------------------------------------------------------------
 
 app.all('*', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*')
@@ -146,10 +173,83 @@ app.get('/auth/twitch/validation', (req, res) => {
 // ----------------------------------------------------------------------------------------------------------
 
 app.get('/streamers', (req, res) => {
-  twitch.getStreamers().then((users) => {
-    const json = []
-    const ids = []
-    users.forEach((u) => {
+  let liste = []
+  mongoose
+    .getStreamersId()
+    .then((list) => {
+      liste = list
+      const ids = []
+      list.forEach((e) => {
+        ids.push(e.id)
+      })
+      return twitch.getStreamers(ids)
+    })
+    .then((users) => {
+      const json = []
+      users.forEach((u, index) => {
+        const streamer = liste[index]
+        const user = {
+          id: u.id,
+          name: u.name,
+          display_name: u.displayName,
+          description: u.description,
+          picture_url: u.profilePictureUrl,
+          broadcaster_type: u.broadcasterType,
+          cache_key: u.cacheKey,
+          offline_url: u.offlinePlaceholderUrl,
+          views: u.views,
+          youtube: streamer.youtube,
+          twitter: streamer.twitter,
+          test: streamer.id,
+        }
+        json.push(user)
+      })
+      res.json(json)
+    })
+})
+
+app.post('/streamer', (req, res) => {
+  twitch
+    .getStreamer(req.body.id)
+    .then((user) => {
+      if (user) {
+        mongoose.createStreamer(req.body.id)
+        res.status(200)
+      } else {
+        res.status(404)
+      }
+      res.end()
+    })
+    .catch((err) => {
+      res.status(400).end()
+    })
+})
+
+app.put('/streamer/:id', (req, res) => {
+  mongoose
+    .updateStreamer(req.params.id, req.body)
+    .then((v) => {
+      res.status(200).end()
+    })
+    .catch((err) => {
+      res.status(400).end()
+    })
+})
+
+app.delete('/streamer/:id', (req, res) => {
+  mongoose
+    .deleteStreamer(req.params.id)
+    .then((v) => {
+      res.status(200).end()
+    })
+    .catch((err) => {
+      res.status(400).end()
+    })
+})
+
+app.get('/streamers/:name', (req, res) => {
+  twitch.getStreamer(req.params.name).then((u) => {
+    if (u) {
       const user = {
         id: u.id,
         name: u.name,
@@ -161,30 +261,18 @@ app.get('/streamers', (req, res) => {
         offline_url: u.offlinePlaceholderUrl,
         views: u.views,
       }
-      ids.push(u.id)
-      json.push(user)
-    })
-    res.json(json)
-  })
-})
-
-app.get('/streamers/:name', (req, res) => {
-  twitch.getStreamer(req.params.name).then((u) => {
-    const user = {
-      id: u.id,
-      name: u.name,
-      display_name: u.displayName,
-      description: u.description,
-      picture_url: u.profilePictureUrl,
-      broadcaster_type: u.broadcasterType,
-      cache_key: u.cacheKey,
-      offline_url: u.offlinePlaceholderUrl,
-      views: u.views,
+      res.json(user)
+    } else {
+      res.status(404).end()
     }
-    res.json(user)
   })
 })
 
+app.get('/test', (req, res) => {
+  mongoose.getStreamersId().then((v) => {
+    res.json(v)
+  })
+})
 // ----------------------------------------------------------------------------------------------------------
 
 app.listen(3000, () => {
