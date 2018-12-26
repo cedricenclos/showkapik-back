@@ -268,9 +268,19 @@ app.get('/streamers/:name', (req, res) => {
   })
 })
 
-app.get('/test', (req, res) => {
-  mongoose.getStreamersId().then((v) => {
-    res.json(v)
+app.get('/stream/:name', (req, res) => {
+  twitch.getStream(req.params.name).then((v) => {
+    req.json(v)
+  })
+})
+
+app.get('/online/:name', (req, res) => {
+  twitch.getStream(req.params.name).then((v) => {
+    if (v) {
+      res.json(true)
+    } else {
+      res.json(false)
+    }
   })
 })
 // ----------------------------------------------------------------------------------------------------------

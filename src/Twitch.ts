@@ -31,7 +31,7 @@ export class Twitch {
     return await this.twitchClient.helix.users.getUserByName(userName)
   }
 
-  async getStream(userId: string): Promise<HelixStream> {
-    return await this.twitchClient.helix.streams.getStreamByUserId(userId)
+  async getStream(userName: string): Promise<HelixStream> {
+    return await this.twitchClient.helix.streams.getStreamByUserName(userName)
   }
 }
